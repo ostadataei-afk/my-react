@@ -4,7 +4,7 @@ import Hello from "./components/Hello";
 import TableList from "./components/TableList";
 import ColumnList from "./components/ColumnList";
 import DataTable from "./components/DataTable";
-
+import RowDetails from "./components/RowDetails";
   type Table = {
   name: string;
 };
@@ -21,6 +21,7 @@ const [selectedTable, setSelectedTable] = useState("");
 const [columns, setColumns] = useState<Column[]>([]);
 const [tables, setTables] = useState<Table[]>([]);
 const [rows, setRows] = useState<Row[]>([]);
+const [selectedRow, setSelectedRow] = useState<Row | null>(null);
   useEffect(() => {
 
     getTables().then((data) => {
@@ -55,7 +56,8 @@ const [rows, setRows] = useState<Row[]>([]);
       جدول انتخاب شده: {selectedTable}
     </p>
     <ColumnList columns={columns} />
-    <DataTable rows={rows} />
+    <DataTable rows={rows} onSelectRow={setSelectedRow}/>
+    <RowDetails row={selectedRow} />
     </div>
   );
 }

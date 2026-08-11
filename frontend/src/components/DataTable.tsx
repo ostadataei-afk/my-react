@@ -5,10 +5,11 @@ type Row = {
 
 type Props = {
   rows: Row[];
+  onSelectRow: (row: Row) => void;
 };
 
 
-function DataTable({ rows }: Props) {
+function DataTable({ rows, onSelectRow }: Props) {
 
 
   if (rows.length === 0) {
@@ -56,7 +57,11 @@ function DataTable({ rows }: Props) {
           {
             rows.map((row, index) => (
 
-              <tr key={index}>
+              <tr
+                key={index}
+                onClick={() => onSelectRow(row)}
+                style={{ cursor: "pointer" }}
+                >
 
                 {
                   columns.map((column) => (
