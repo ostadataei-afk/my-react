@@ -3,10 +3,18 @@ import { getTables, getColumns } from "./api/api";
 import Hello from "./components/Hello";
 import TableList from "./components/TableList";
 import ColumnList from "./components/ColumnList";
+
 function App() {
+  type Table = {
+  name: string;
+};
+
+type Column = {
+  name: string;
+};
   const [selectedTable, setSelectedTable] = useState("");
-  const [columns, setColumns] = useState<any[]>([]);
-  const [tables, setTables] = useState<any[]>([]);
+const [columns, setColumns] = useState<Column[]>([]);
+const [tables, setTables] = useState<Table[]>([]);
 
   useEffect(() => {
 
