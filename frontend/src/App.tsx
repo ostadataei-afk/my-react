@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { getTables, getColumns } from "./api/api";
+import { getTables, getColumns, getData } from "./api/api";
 import Hello from "./components/Hello";
 import TableList from "./components/TableList";
 import ColumnList from "./components/ColumnList";
+import DataTable from "./components/DataTable";
 
-function App() {
   type Table = {
   name: string;
 };
@@ -12,10 +12,15 @@ function App() {
 type Column = {
   name: string;
 };
-  const [selectedTable, setSelectedTable] = useState("");
+type Row = {
+  [key: string]: string | number | null;
+};
+function App() {
+
+const [selectedTable, setSelectedTable] = useState("");
 const [columns, setColumns] = useState<Column[]>([]);
 const [tables, setTables] = useState<Table[]>([]);
-
+const [rows, setRows] = useState<Row[]>([]);
   useEffect(() => {
 
     getTables().then((data) => {
@@ -41,13 +46,16 @@ const [tables, setTables] = useState<Table[]>([]);
       console.log("COLUMNS RESPONSE:", data);
       setColumns(data.results ?? data);
     });
-
+    getData(tableName).then((data) => {
+      setRows(data.results);
+    });
       }}
     />
     <p>
       جدول انتخاب شده: {selectedTable}
     </p>
     <ColumnList columns={columns} />
+    <DataTable rows={rows} />
     </div>
   );
 }

@@ -24,3 +24,15 @@ export async function getColumns(tableName: string) {
   return data;
 
 }
+export async function getData(tableName: string) {
+
+  const response = await fetch(
+    `${API_URL}/api/data/${tableName}`
+  );
+
+  const data = await response.json();
+
+  console.log("DATA RESPONSE:", data);
+
+  return data;
+}
