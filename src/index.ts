@@ -1,7 +1,9 @@
+export interface Env {DB: D1Database;ASSETS: Fetcher;}
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 }
@@ -13,20 +15,54 @@ export default {
       });
     }
     const url = new URL(request.url);
-    if (url.pathname === "/api/tables") {
+    if (request.method === "POST" && url.pathname === "/api/tables" ) 
+      {
+      const body = await request.json() as {tableName: string;};
+      const tableName = body.tableName;
+      await env.DB
+        .prepare(`CREATE TABLE "${tableName}" (id INTEGER PRIMARY KEY)`)
+        .run();
+      return Response.json(
+        { success: true,
+          tableName
+        },{ headers: corsHeaders(),}
+      );
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname.match(/^\/api\/table\/[^/]+\/column$/)
+    ) {
+      const parts = url.pathname.split("/");
+      const tableName = parts[3];
+      const body = await request.json() as {columnName: string;columnType: string;};
       const result = await env.DB
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
-        )
+        .prepare(`ALTER TABLE "${tableName}" ADD COLUMN "${body.columnName}" ${body.columnType}`)
+        .run();
+      return Response.json(
+        {
+          success: true,
+          tableName,
+          columnName: body.columnName,
+          columnType: body.columnType,
+          changes: result.meta.changes
+        },
+        {
+          headers: corsHeaders(),
+        }
+      );
+    }
+    if (
+      request.method === "GET" && url.pathname === "/api/tables") 
+      {
+      const result = await env.DB
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'")
         .all();
       return Response.json(result, {
         headers: corsHeaders(),
       });
     }
-    if (
-      request.method === "PUT" &&
-      url.pathname.startsWith("/api/data/")
-    ) {
+    if (request.method === "PUT" && url.pathname.startsWith("/api/data/")) 
+      {
       const parts = url.pathname.split("/");
       const tableName = parts[3];
       const id = parts[4];
@@ -37,13 +73,8 @@ export default {
         .map(column => `${column} = ?`)
         .join(", ");
       const result = await env.DB
-        .prepare(
-          `UPDATE "${tableName}" SET ${setQuery} WHERE id = ?`
-        )
-        .bind(
-          ...values,
-          id
-        )
+        .prepare(`UPDATE "${tableName}" SET ${setQuery} WHERE id = ?`)
+        .bind(...values,id)
         .run();
       return Response.json(
         {
@@ -52,9 +83,7 @@ export default {
           tableName,
           id
         },
-        {
-          headers: corsHeaders(),
-        }
+        {headers: corsHeaders(),}
       );
     }
     if (
@@ -65,9 +94,7 @@ export default {
       const tableName = parts[3];
       const id = parts[4];
       const result = await env.DB
-        .prepare(
-          `DELETE FROM "${tableName}" WHERE id = ?`
-        )
+        .prepare(`DELETE FROM "${tableName}" WHERE id = ?`)
         .bind(id)
         .run();
       return Response.json(
@@ -82,34 +109,22 @@ export default {
         }
       );
     }
-
-	
 	if (
-  request.method === "POST" &&
-  url.pathname.startsWith("/api/data/")
-) {
-
+  request.method === "POST" &&  url.pathname.startsWith("/api/data/")) 
+  {
   const tableName = url.pathname.split("/").pop();
-
   const body = await request.json() as Record<string, string | number | null>;
-
   const columns = Object.keys(body);
-
   const values = Object.values(body);
-
   const placeholders = columns
     .map(() => "?")
     .join(", ");
-
   const result = await env.DB
-    .prepare(
-      `INSERT INTO "${tableName}" (${columns.join(", ")}) VALUES (${placeholders})`
-    )
+    .prepare(`INSERT INTO "${tableName}" (${columns.join(", ")}) VALUES (${placeholders})`)
     .bind(
       ...values
     )
     .run();
-
   return Response.json(
     {
       success: true,
@@ -121,26 +136,23 @@ export default {
       headers: corsHeaders(),
     }
   );
-
 }
-    if (url.pathname.startsWith("/api/table/")) {
-      const tableName = url.pathname.split("/").pop();
+    if (
+      request.method === "GET" && url.pathname.startsWith("/api/table/")) 
+      {
+      const parts = url.pathname.split("/");
+      const tableName = parts[3];
       const result = await env.DB
-        .prepare(`PRAGMA table_info(${tableName})`)
+        .prepare(`PRAGMA table_info("${tableName}")`)
         .all();
-      return Response.json(result, {
-        headers: corsHeaders(),
-      });
-    }
+      return Response.json(result, {headers: corsHeaders(),});}
     if (url.pathname.startsWith("/api/data/")) {
       const tableName = url.pathname.split("/").pop();
       try {
         const result = await env.DB
           .prepare(`SELECT * FROM "${tableName}"`)
           .all();
-        return Response.json(result, {
-          headers: corsHeaders(),
-        });
+        return Response.json(result, {headers: corsHeaders(),});
       } catch (error) {
         return Response.json(
           {
@@ -154,8 +166,13 @@ export default {
         );
       }
     }
-    return new Response("API is running", {
-      headers: corsHeaders(),
-    });
+// اگر مسیر API بود ولی هیچ‌کدام از هندلرها آن را نگرفتند → 404 بده
+    if (url.pathname.startsWith("/api")) {
+      return new Response("Unknown API route", {
+        status: 404,
+        headers: corsHeaders(),
+      });
+    }
+    return env.ASSETS.fetch(request);
   },
 } satisfies ExportedHandler<Env>;

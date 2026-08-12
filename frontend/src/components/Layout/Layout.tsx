@@ -6,14 +6,12 @@ type Props = {
 
 function Layout({ children }: Props) {
   return (
-    <div>
+    <div className="app-layout">
       <Header />
-
-      <main>
-        {children}
-      </main>
+      <div className="app-body">
+        <main className="content">{children}</main>
+      </div>
     </div>
   );
 }
-
 export default Layout;
