@@ -58,6 +58,8 @@ const row = {
       await onCreateRow(row);
       setNewRow({});
       inputRefs.current[0]?.focus();
+    } catch {
+      // The parent displays the error; preserve the draft for retry.
     } finally {
       savingRef.current = false;
     }
@@ -189,7 +191,7 @@ const handleEditKeyDown = (event: React.KeyboardEvent<HTMLInputElement>,index: n
                         setOriginalRow(null);
                         return;
                       }
-                      await onUpdateRow(editValues);
+                      try { await onUpdateRow(editValues); } catch { return; }
                       setEditingId(null);
                       setEditValues({});
                       setOriginalRow(null);

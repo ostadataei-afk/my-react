@@ -1,131 +1,37 @@
-const API_URL = "https://d1-manager.ostad-ataei.workers.dev";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://d1-manager.ostad-ataei.workers.dev";
 
-//const API_URL = "http://127.0.0.1:8787";
-export async function getTables() {
-  const response = await fetch(
-  `${API_URL}/api/tables`
-  );
-  const data = await response.json();
-  console.log("API DATA:", data);
-  return data;
-}
-export async function getData(tableName: string) {
-  const response = await fetch(
-  `${API_URL}/api/data/${tableName}`
-  );
-  const data = await response.json();
-  console.log("DATA RESPONSE:", data);
-  return data;
-}
-export async function updateRow(
-    tableName: string,
-    id: string | number,
-    data: Record<string, string | number | null>
-    ) {
-    const response = await fetch(
-    `${API_URL}/api/data/${tableName}/${id}`,
-    {
-    method: "PUT",
-    headers: {"Content-Type": "application/json",},
-    body: JSON.stringify(data),
-    }
-    );
-    return await response.json();
-}
-// ایجاد رکورد جدید در جدول
-export async function createRow(tableName: string,data: Record<string, string | number | null>) 
-{
-    const response = await fetch(
-      `${API_URL}/api/data/${tableName}`,
-      {
-        method: "POST",
-        headers: {"Content-Type": "application/json",},
-        body: JSON.stringify(data),
-      }
-    );
-    return await response.json();
-}
+type Row = Record<string, string | number | null>;
+type Result<T> = { success: boolean; results: T[] };
 
-export async function deleteRow(tableName: string,id: string | number) 
-{
-  const response = await fetch(
-  `${API_URL}/api/data/${tableName}/${id}`,
-  {
-  method: "DELETE",
-  headers: {"Content-Type": "application/json",},
+async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok || data.success === false) {
+    throw new Error(data.error || "عملیات انجام نشد");
   }
-  );
-  return await response.json();
-}
-
-
-export async function createTable(tableName: string) {
-  const response = await fetch(
-    `${API_URL}/api/tables`,
-    {
-      method: "POST",
-      headers: {"Content-Type": "application/json",},
-      body: JSON.stringify({
-      tableName,
-      }),
-    }
-  );
-  return await response.json();
-}
-
-
-export async function renameTable(
-    oldName: string,
-    newName: string
-  ) {
-    const response = await fetch(
-      `${API_URL}/api/table/${oldName}`,
-      {
-        method: "PUT",
-        headers: {"Content-Type": "application/json",},
-        body: JSON.stringify({
-        name: newName,
-        }),
-      }
-    );
-    return await response.json();
-}
-
-
-export async function deleteTable(
-    tableName: string
-  ) {
-    const response = await fetch(
-      `${API_URL}/api/table/${tableName}`,
-      {
-        method: "DELETE",
-      }
-    );
-    return await response.json();
-}
-
-export async function createColumn(tableName: string,columnName: string,columnType: string) 
-{
-    const response = await fetch(
-      `${API_URL}/api/table/${tableName}/column`,
-      {
-        method: "POST",
-        headers: {"Content-Type": "application/json",},
-        body: JSON.stringify({
-        columnName,
-        columnType,
-        }),
-      }
-    );
-    return await response.json();
-}
-
-
-export async function getColumns(tableName: string) {
-  const response = await fetch(
-    `${API_URL}/api/table/${tableName}`
-  );
-  const data = await response.json();
-  console.log("COLUMN DATA:", data);
   return data;
 }
+
+const tablePath = (name: string) => `/api/table/${encodeURIComponent(name)}`;
+const dataPath = (name: string) => `/api/data/${encodeURIComponent(name)}`;
+export const getTables = () => request<Result<{name: string}>>("/api/tables");
+export const getData = (table: string) => request<Result<Row>>(dataPath(table));
+export const getColumns = (table: string) => request<Result<{name: string; pk: number}>>(tablePath(table));
+export const createTable = (tableName: string) => request<{success: boolean}>("/api/tables", "POST", {tableName});
+export const renameTable = (table: string, name: string) => request(tablePath(table), "PUT", {name});
+export const deleteTable = (table: string) => request(tablePath(table), "DELETE");
+export const createColumn = (table: string, columnName: string, columnType: string) =>
+  request<{success: boolean; error?: string}>(`${tablePath(table)}/column`, "POST", {columnName, columnType});
+export const renameColumn = (table: string, column: string, name: string) =>
+  request(`${tablePath(table)}/column/${encodeURIComponent(column)}`, "PUT", {name});
+export const deleteColumn = (table: string, column: string) =>
+  request(`${tablePath(table)}/column/${encodeURIComponent(column)}`, "DELETE");
+export const createRow = (table: string, row: Row) => request(dataPath(table), "POST", row);
+export const updateRow = (table: string, id: string | number, row: Row) =>
+  request(`${dataPath(table)}/${encodeURIComponent(id)}`, "PUT", row);
+export const deleteRow = (table: string, id: string | number) =>
+  request(`${dataPath(table)}/${encodeURIComponent(id)}`, "DELETE");
