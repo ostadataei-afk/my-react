@@ -7,6 +7,24 @@ function corsHeaders() {
     "Access-Control-Allow-Headers": "Content-Type",
   };
 }
+class ApiError extends Error {
+  constructor(public status: number, message: string) { super(message); }
+}
+
+function identifier(value: unknown): string {
+  if (typeof value !== "string" || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value) || /^(sqlite_|_cf_)/i.test(value)) {
+    throw new ApiError(400, "نام جدول یا ستون نامعتبر است");
+  }
+  return `"${value}"`;
+}
+
+async function tableColumns(db: D1Database, name: string) {
+  const quoted = identifier(name);
+  const exists = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ? COLLATE NOCASE").bind(name).first();
+  if (!exists) throw new ApiError(404, "جدول پیدا نشد");
+  return (await db.prepare(`PRAGMA table_info(${quoted})`).all<{name: string; pk: number}>()).results;
+}
+
 export default {
   async fetch(request, env): Promise<Response> {
     if (request.method === "OPTIONS") {
@@ -15,6 +33,40 @@ export default {
       });
     }
     const url = new URL(request.url);
+    try {
+    const management = url.pathname.match(/^\/api\/table\/([^/]+)(?:\/column\/([^/]+))?$/);
+    if (management && ["PUT", "DELETE"].includes(request.method)) {
+      const tableName = decodeURIComponent(management[1]);
+      const table = identifier(tableName);
+      const columns = await tableColumns(env.DB, tableName);
+      const columnName = management[2] ? decodeURIComponent(management[2]) : null;
+      if (columnName !== null) {
+        const column = identifier(columnName);
+        const existing = columns.find(item => item.name.toLowerCase() === columnName.toLowerCase());
+        if (!existing) throw new ApiError(404, "ستون پیدا نشد");
+        if (existing.pk || existing.name.toLowerCase() === "id") throw new ApiError(400, "تغییر یا حذف ستون کلید اصلی مجاز نیست");
+        if (request.method === "DELETE") {
+          await env.DB.prepare(`ALTER TABLE ${table} DROP COLUMN ${column}`).run();
+        } else {
+          const body = await request.json() as {name?: unknown};
+          const name = body?.name;
+          const renamed = identifier(name);
+          if (typeof name !== "string" || name.toLowerCase() === "id") throw new ApiError(400, "نام ستون مجاز نیست");
+          if (columns.some(item => item.name.toLowerCase() === name.toLowerCase())) throw new ApiError(409, "نام ستون تکراری است");
+          await env.DB.prepare(`ALTER TABLE ${table} RENAME COLUMN ${column} TO ${renamed}`).run();
+        }
+      } else if (request.method === "DELETE") {
+        await env.DB.prepare(`DROP TABLE ${table}`).run();
+      } else {
+        const body = await request.json() as {name?: unknown};
+        const name = body?.name;
+        const renamed = identifier(name);
+        const duplicate = await env.DB.prepare("SELECT name FROM sqlite_master WHERE name = ? COLLATE NOCASE").bind(name as string).first();
+        if (duplicate) throw new ApiError(409, "نام جدول تکراری است");
+        await env.DB.prepare(`ALTER TABLE ${table} RENAME TO ${renamed}`).run();
+      }
+      return Response.json({success: true}, {headers: corsHeaders()});
+    }
     if (request.method === "POST" && url.pathname === "/api/tables" ) 
       {
       const body = await request.json() as {tableName: string;};
@@ -153,7 +205,7 @@ export default {
           .prepare(`SELECT * FROM "${tableName}"`)
           .all();
         return Response.json(result, {headers: corsHeaders(),});
-      } catch (error) {
+    } catch (error) {
         return Response.json(
           {
             error: String(error),
@@ -174,5 +226,10 @@ export default {
       });
     }
     return env.ASSETS.fetch(request);
+    } catch (error) {
+      const status = error instanceof ApiError ? error.status : error instanceof SyntaxError || error instanceof URIError ? 400 : 500;
+      const message = error instanceof ApiError ? error.message : status === 400 ? "درخواست نامعتبر است" : "عملیات انجام نشد؛ محدودیت‌های جدول یا ارتباط با پایگاه داده را بررسی کنید";
+      return Response.json({success: false, error: message}, {status, headers: corsHeaders()});
+    }
   },
 } satisfies ExportedHandler<Env>;

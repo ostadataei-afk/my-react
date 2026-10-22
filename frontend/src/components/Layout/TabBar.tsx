@@ -1,9 +1,12 @@
 type Props = {tables: {name: string;}[];activeTable: string;
   onSelect: (name: string) => void;
   onCreateTable: () => void;
+  onRenameTable: () => void;
+  onDeleteTable: () => void;
+  disabled: boolean;
 };
 
-function TabBar({tables,activeTable,onSelect,onCreateTable,}: Props) 
+function TabBar({tables,activeTable,onSelect,onCreateTable,onRenameTable,onDeleteTable,disabled,}: Props)
 {
   return (
     <div
@@ -27,6 +30,7 @@ function TabBar({tables,activeTable,onSelect,onCreateTable,}: Props)
         {tables.map((table) => (
           <button
             key={table.name}
+            disabled={disabled}
             onClick={() => onSelect(table.name)}
             style={{
               height: "36px",
@@ -64,6 +68,7 @@ function TabBar({tables,activeTable,onSelect,onCreateTable,}: Props)
       >
         <button
           title="جدول جدید"
+          disabled={disabled}
           onClick={onCreateTable}
           style={{
             width: "36px",
@@ -79,6 +84,8 @@ function TabBar({tables,activeTable,onSelect,onCreateTable,}: Props)
 
         <button
           title="تغییر نام جدول"
+          disabled={disabled || !activeTable}
+          onClick={onRenameTable}
           style={{
             width: "36px",
             height: "36px",
@@ -94,6 +101,8 @@ function TabBar({tables,activeTable,onSelect,onCreateTable,}: Props)
 
         <button
           title="حذف جدول"
+          disabled={disabled || !activeTable}
+          onClick={onDeleteTable}
           style={{
             width: "36px",
             height: "36px",
